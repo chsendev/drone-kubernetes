@@ -20,6 +20,21 @@ if [ ! -z ${PLUGIN_KUBERNETES_CERT} ]; then
   KUBERNETES_CERT=${PLUGIN_KUBERNETES_CERT}
 fi
 
+if [ -z "${PLUGIN_DEPLOYMENT}" ]; then
+  echo "ERROR: PLUGIN_DEPLOYMENT is required"
+  exit 1
+fi
+
+if [ -z "${PLUGIN_REPO}" ]; then
+  echo "ERROR: PLUGIN_REPO is required"
+  exit 1
+fi
+
+if [ -z "${PLUGIN_TAG}" ]; then
+  echo "ERROR: PLUGIN_TAG is required"
+  exit 1
+fi
+
 kubectl config set-credentials default --token=${KUBERNETES_TOKEN}
 if [ ! -z ${KUBERNETES_CERT} ]; then
   echo ${KUBERNETES_CERT} | base64 -d > ca.crt
