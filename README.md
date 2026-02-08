@@ -12,7 +12,7 @@ This pipeline will update the `my-deployment` deployment with the image tagged `
             image: quay.io/honestbee/drone-kubernetes
             deployment: my-deployment
             repo: myorg/myrepo
-            container: my-container
+            container: my-container # Optional default to using the first container name
             tag: 
                 - mytag
                 - latest
