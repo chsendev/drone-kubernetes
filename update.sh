@@ -50,16 +50,27 @@ kubectl config use-context default
 # kubectl version
 IFS=',' read -r -a DEPLOYMENTS <<< "${PLUGIN_DEPLOYMENT}"
 
+DEPLOY_SUCCESS=false
+
 for DEPLOY in ${DEPLOYMENTS[@]}; do
-  echo "Deploying to $KUBERNETES_SERVER"
+  echo "=========================================="
+  echo "Processing deployment: ${DEPLOY}"
+  
+  if ! kubectl -n ${PLUGIN_NAMESPACE} get deployment/${DEPLOY} &> /dev/null; then
+    echo "WARNING: Deployment ${DEPLOY} does not exist in namespace ${PLUGIN_NAMESPACE}, skipping..."
+    echo "This is normal for first-time pipeline run. Please create the deployment manually or via KubeSphere UI first."
+    continue
+  fi
+  
+  echo "Deployment ${DEPLOY} found, proceeding with update..."
   
   if [ -z "${PLUGIN_CONTAINER}" ]; then
     echo "No container specified, using first container from deployment ${DEPLOY}"
     FIRST_CONTAINER=$(kubectl -n ${PLUGIN_NAMESPACE} get deployment/${DEPLOY} -o jsonpath='{.spec.template.spec.containers[0].name}')
     
     if [ -z "${FIRST_CONTAINER}" ]; then
-      echo "ERROR: Failed to get container name from deployment ${DEPLOY}"
-      exit 1
+      echo "WARNING: Failed to get container name from deployment ${DEPLOY}, skipping..."
+      continue
     fi
     
     CONTAINERS=("${FIRST_CONTAINER}")
@@ -76,7 +87,22 @@ for DEPLOY in ${DEPLOYMENTS[@]}; do
     fi
     
     echo "Updating image for ${CONTAINER} in deployment ${DEPLOY} to ${PLUGIN_REPO}:${PLUGIN_TAG}"
-    kubectl -n ${PLUGIN_NAMESPACE} set image deployment/${DEPLOY} \
-      ${CONTAINER}=${PLUGIN_REPO}:${PLUGIN_TAG} --record
+    if kubectl -n ${PLUGIN_NAMESPACE} set image deployment/${DEPLOY} \
+      ${CONTAINER}=${PLUGIN_REPO}:${PLUGIN_TAG} --record; then
+      echo "Successfully updated ${CONTAINER} in deployment ${DEPLOY}"
+      DEPLOY_SUCCESS=true
+    else
+      echo "WARNING: Failed to update ${CONTAINER} in deployment ${DEPLOY}"
+    fi
   done
 done
+
+echo "=========================================="
+if [ "$DEPLOY_SUCCESS" = true ]; then
+  echo "Deployment completed successfully"
+  exit 0
+else
+  echo "WARNING: No deployments were updated. This might be the first pipeline run."
+  echo "Please ensure deployments exist in namespace ${PLUGIN_NAMESPACE} before running this script."
+  exit 0
+fi
