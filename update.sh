@@ -49,14 +49,33 @@ kubectl config use-context default
 
 # kubectl version
 IFS=',' read -r -a DEPLOYMENTS <<< "${PLUGIN_DEPLOYMENT}"
-IFS=',' read -r -a CONTAINERS <<< "${PLUGIN_CONTAINER}"
+
 for DEPLOY in ${DEPLOYMENTS[@]}; do
-  echo Deploying to $KUBERNETES_SERVER
+  echo "Deploying to $KUBERNETES_SERVER"
+  
+  if [ -z "${PLUGIN_CONTAINER}" ]; then
+    echo "No container specified, using first container from deployment ${DEPLOY}"
+    FIRST_CONTAINER=$(kubectl -n ${PLUGIN_NAMESPACE} get deployment/${DEPLOY} -o jsonpath='{.spec.template.spec.containers[0].name}')
+    
+    if [ -z "${FIRST_CONTAINER}" ]; then
+      echo "ERROR: Failed to get container name from deployment ${DEPLOY}"
+      exit 1
+    fi
+    
+    CONTAINERS=("${FIRST_CONTAINER}")
+    echo "Using container: ${FIRST_CONTAINER}"
+  else
+    IFS=',' read -r -a CONTAINERS <<< "${PLUGIN_CONTAINER}"
+  fi
+  
   for CONTAINER in ${CONTAINERS[@]}; do
     if [[ ${PLUGIN_FORCE} == "true" ]]; then
+      echo "Force updating image for ${CONTAINER} in deployment ${DEPLOY}"
       kubectl -n ${PLUGIN_NAMESPACE} set image deployment/${DEPLOY} \
         ${CONTAINER}=${PLUGIN_REPO}:${PLUGIN_TAG}FORCE
     fi
+    
+    echo "Updating image for ${CONTAINER} in deployment ${DEPLOY} to ${PLUGIN_REPO}:${PLUGIN_TAG}"
     kubectl -n ${PLUGIN_NAMESPACE} set image deployment/${DEPLOY} \
       ${CONTAINER}=${PLUGIN_REPO}:${PLUGIN_TAG} --record
   done
